@@ -12,14 +12,14 @@ const (
 	CHANNEL_BUFFER_SIZE_ITEMS = 20480 // this many MSG_SIZE_BYTES worth of buffering
 )
 
-func Register(name string) (<-chan string, error) {
+func Register(iglueId string) (<-chan string, error) {
 	// ensure machine-global fifo registery directory exists
 	err := os.MkdirAll(FIFO_DIR, 0777)
 	if err != nil {
 		panic(err)
 	}
 
-	fifoPath, err := createFifo(fmt.Sprintf("%s/%s", FIFO_DIR, name))
+	fifoPath, err := createFifo(idToFifoPath(iglueId))
 	if err != nil {
 		panic(err)
 	}
@@ -59,8 +59,26 @@ func Register(name string) (<-chan string, error) {
 	return fifoChan, err
 }
 
-func Unregister(name string) error {
-	path := fmt.Sprintf("%s/%s", FIFO_DIR, name)
+func Unregister(iglueId string) error {
+	path := idToFifoPath(iglueId)
 	fmt.Println("Removing fifo", path)
 	return os.Remove(path)
+}
+
+// TODO: This function has a lot of potential for 
+// optimization.
+func Send(iglueId string, msg string) error {
+	fifo, err := os.OpenFile(idToFifoPath(iglueId), os.O_APPEND|os.O_WRONLY, 0600)
+	defer fifo.Close()
+
+	if err != nil {
+		return err
+	}
+
+	_, err = fifo.WriteString(msg)
+	return err
+}
+
+func idToFifoPath(iglueId string) string {
+	return fmt.Sprintf("%s/%s", FIFO_DIR, iglueId)
 }

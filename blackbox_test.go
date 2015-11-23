@@ -24,14 +24,17 @@ func TestRegister(t *testing.T) {
 	}
 }
 
-func TestFifoRead(t *testing.T) {
+func TestFifoReadWrite(t *testing.T) {
+	id := "baz"
+	channel, _ := iglue.Register(id)
+	defer iglue.Unregister(id)
 
-	channel, _ := iglue.Register("baz")
-	defer iglue.Unregister("baz")
-
-	for {
-		fmt.Println("---------")
-		fmt.Println("Attempting to receive from channel baz")
-		fmt.Println("!!! Received msg: ", <-channel)
+	err := iglue.Send(id, "hello iglue\n")
+	if err != nil {
+		t.Errorf("Error encountered while Sending! - %s", err.Error())
 	}
+
+	fmt.Println("---------")
+	fmt.Println("Attempting to receive from channel baz")
+	fmt.Println("Received msg: ", <-channel)
 }
