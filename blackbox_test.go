@@ -1,8 +1,8 @@
 package iglue_test
 
 import (
-	"github.com/nightowlware/iglue"
 	"fmt"
+	"github.com/nightowlware/iglue"
 	"testing"
 	"time"
 )
@@ -11,7 +11,7 @@ func TestRegister(t *testing.T) {
 	iglue.Register("foo")
 	iglue.Register("bar")
 
-	// give some time for the underlying goroutine to 
+	// give some time for the underlying goroutine to
 	// spin up and open the pipe
 	time.Sleep(1000 * time.Millisecond)
 

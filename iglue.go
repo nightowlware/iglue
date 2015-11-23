@@ -2,15 +2,14 @@ package iglue
 
 import (
 	"fmt"
-	"os"
 	"io"
-	"syscall"
+	"os"
 )
 
 const (
-	MSG_SIZE_BYTES            = 512
+	MSG_SIZE_BYTES            = 1024
 	FIFO_DIR                  = "/tmp/iglue"
-	CHANNEL_BUFFER_SIZE_ITEMS = 20480 // 10MB max worth of buffering
+	CHANNEL_BUFFER_SIZE_ITEMS = 20480 // this many MSG_SIZE_BYTES worth of buffering
 )
 
 func Register(name string) (<-chan string, error) {
@@ -45,7 +44,7 @@ func Register(name string) (<-chan string, error) {
 				msg := string(buf[:n])
 				fifoChan <- msg
 			} else if err == io.EOF {
-				// not intuitive: we have to re-open the fifo if we ever get a 
+				// not intuitive: we have to re-open the fifo if we ever get a
 				// read of zero bytes (EOF), so that we block again. Ugly,
 				// but those are the semantics of unix pipes.
 				fifo, err = os.Open(fifoPath)
@@ -64,16 +63,4 @@ func Unregister(name string) error {
 	path := fmt.Sprintf("%s/%s", FIFO_DIR, name)
 	fmt.Println("Removing fifo", path)
 	return os.Remove(path)
-}
-
-// createFifo currently only works on Linux.
-// TODO: Implement for Windows/Mac.
-func createFifo(path string) (string, error) {
-	err := syscall.Mknod(path, syscall.S_IFIFO|0666, 0)
-	if err != nil {
-		return "FIFO_FAIL", fmt.Errorf("Could not create fifo: %s : %s", path, err.Error())
-	}
-
-	fmt.Println("Created fifo: ", path)
-	return path, nil
 }
