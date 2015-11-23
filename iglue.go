@@ -1,4 +1,4 @@
-package ipglue
+package iglue
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 
 const (
 	MSG_SIZE_BYTES            = 512
-	FIFO_DIR                  = "/tmp/ipglue"
+	FIFO_DIR                  = "/tmp/iglue"
 	CHANNEL_BUFFER_SIZE_ITEMS = 20480 // 10MB max worth of buffering
 )
 

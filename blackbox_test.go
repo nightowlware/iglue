@@ -1,33 +1,33 @@
-package ipglue_test
+package iglue_test
 
 import (
-	"github.com/nightowlware/ipglue"
+	"github.com/nightowlware/iglue"
 	"fmt"
 	"testing"
 	"time"
 )
 
 func TestRegister(t *testing.T) {
-	ipglue.Register("foo")
-	ipglue.Register("bar")
+	iglue.Register("foo")
+	iglue.Register("bar")
 
 	// give some time for the underlying goroutine to 
 	// spin up and open the pipe
 	time.Sleep(1000 * time.Millisecond)
 
-	if err := ipglue.Unregister("foo"); err != nil {
+	if err := iglue.Unregister("foo"); err != nil {
 		t.Errorf("Could not unregister: %s", err.Error())
 	}
 
-	if err := ipglue.Unregister("bar"); err != nil {
+	if err := iglue.Unregister("bar"); err != nil {
 		t.Errorf("Could not unregister: %s", err.Error())
 	}
 }
 
 func TestFifoRead(t *testing.T) {
 
-	channel, _ := ipglue.Register("baz")
-	defer ipglue.Unregister("baz")
+	channel, _ := iglue.Register("baz")
+	defer iglue.Unregister("baz")
 
 	for {
 		fmt.Println("---------")

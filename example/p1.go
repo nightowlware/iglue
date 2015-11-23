@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	_ "github.com/nightowlware/ipglue/example"
+	_ "github.com/nightowlware/iglue/example"
 )
 
 

@@ -1,5 +1,5 @@
-# ipglue
-Pronounced like "igloo".
+# iglue
+Pronounced "igloo".
 Stands for "ipc glue" or "inter-process glue". 
 
 It's a very lightweight ipc library, written in Go. All inter-process messages are fixed size strings, 
