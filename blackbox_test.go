@@ -29,12 +29,20 @@ func TestFifoReadWrite(t *testing.T) {
 	channel, _ := iglue.Register(id)
 	defer iglue.Unregister(id)
 
-	err := iglue.Send(id, "hello iglue\n")
-	if err != nil {
-		t.Errorf("Error encountered while Sending! - %s", err.Error())
+	msgs := []string{"hello iglue", "this is iglue ipc", "and it works great!", "quit"}
+
+	for _, msg := range msgs {
+		err := iglue.Send(iglue.Msg{"baz", msg})
+		if err != nil {
+			t.Errorf("Error encountered while Sending! - %s", err.Error())
+			t.FailNow()
+		}
 	}
 
-	fmt.Println("---------")
-	fmt.Println("Attempting to receive from channel baz")
-	fmt.Println("Received msg: ", <-channel)
+	recvmsg := iglue.Msg{}
+	for recvmsg.Payload != "quit" {
+		fmt.Println("Attempting to receive from channel baz")
+		recvmsg = <-channel
+		fmt.Println("Received msg: ", recvmsg)
+	}
 }

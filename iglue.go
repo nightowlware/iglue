@@ -1,20 +1,47 @@
 package iglue
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 const (
+	PAYLOAD_SEPARATOR         = "|"
 	MSG_SIZE_BYTES            = 1024
 	FIFO_DIR                  = "/tmp/iglue"
 	CHANNEL_BUFFER_SIZE_ITEMS = 20480 // this many MSG_SIZE_BYTES worth of buffering
 )
 
-func Register(iglueId string) (<-chan string, error) {
+type Msg struct {
+	Id      string // the sender's id
+	Payload string // the payload
+}
+
+// String returns a string representation of the IglueMsg
+func (m Msg) String() string {
+	return fmt.Sprint(m.Id, PAYLOAD_SEPARATOR, m.Payload)
+}
+
+func validateIglueId(iglueId string) error {
+	if strings.Contains(iglueId, PAYLOAD_SEPARATOR) {
+		return fmt.Errorf("Iglue ID cannot contain the Payload Separator character <%s>", PAYLOAD_SEPARATOR)
+	}
+
+	return nil
+}
+
+func Register(iglueId string) (<-chan Msg, error) {
+	err := validateIglueId(iglueId)
+	if err != nil {
+		panic(err)
+	}
+
 	// ensure machine-global fifo registery directory exists
-	err := os.MkdirAll(FIFO_DIR, 0777)
+	err = os.MkdirAll(FIFO_DIR, 0777)
 	if err != nil {
 		panic(err)
 	}
@@ -24,7 +51,7 @@ func Register(iglueId string) (<-chan string, error) {
 		panic(err)
 	}
 
-	fifoChan := make(chan string, CHANNEL_BUFFER_SIZE_ITEMS)
+	iglueChan := make(chan Msg, CHANNEL_BUFFER_SIZE_ITEMS)
 
 	// launch a go-routine that continuously reads from the fifo
 	// and stuffs the data into the channel:
@@ -39,14 +66,18 @@ func Register(iglueId string) (<-chan string, error) {
 		buf := make([]byte, MSG_SIZE_BYTES)
 
 		for {
-			n, err := fifo.Read(buf)
+			_, err := fifo.Read(buf)
 			if err == nil {
-				msg := string(buf[:n])
-				fifoChan <- msg
+				// read fixed-size messages, but trim off the
+				// padded null bytes before pushing the string into the
+				// channel
+				msg := string(bytes.TrimRight(buf[:MSG_SIZE_BYTES], "\x00"))
+				splits := strings.SplitN(msg, PAYLOAD_SEPARATOR, 2)
+				iglueChan <- Msg{splits[0], splits[1]}
 			} else if err == io.EOF {
 				// not intuitive: we have to re-open the fifo if we ever get a
 				// read of zero bytes (EOF), so that we block again. Ugly,
-				// but those are the semantics of unix pipes.
+				// but those are the semantics of (posix) pipes.
 				fifo, err = os.Open(fifoPath)
 			} else {
 				fmt.Println(err)
@@ -56,7 +87,7 @@ func Register(iglueId string) (<-chan string, error) {
 		}
 	}()
 
-	return fifoChan, err
+	return iglueChan, err
 }
 
 func Unregister(iglueId string) error {
@@ -65,17 +96,28 @@ func Unregister(iglueId string) error {
 	return os.Remove(path)
 }
 
-// TODO: This function has a lot of potential for 
+// TODO: This function has a lot of potential for
 // optimization.
-func Send(iglueId string, msg string) error {
-	fifo, err := os.OpenFile(idToFifoPath(iglueId), os.O_APPEND|os.O_WRONLY, 0600)
+func Send(igluemsg Msg) error {
+	fifo, err := os.OpenFile(idToFifoPath(igluemsg.Id), os.O_APPEND|os.O_WRONLY, 0600)
 	defer fifo.Close()
 
 	if err != nil {
 		return err
 	}
 
-	_, err = fifo.WriteString(msg)
+	msgbuf := []byte(igluemsg.String())
+
+	// check number of *bytes* (not characters) in msg,
+	// and make sure it's no more than the max allowed.
+	padsize := MSG_SIZE_BYTES - len(msgbuf)
+	if padsize < 0 {
+		return errors.New("Send(): Message size exceeds max allowed!")
+	}
+
+	// force sending fixed-size messages by padding up to MSG_SIZE_BYTES
+	// the pad is made of null-bytes
+	_, err = fifo.Write(append(msgbuf, make([]byte, padsize)...))
 	return err
 }
 
