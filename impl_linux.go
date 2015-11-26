@@ -13,6 +13,6 @@ func createFifo(path string) (string, error) {
 		return "FIFO_FAIL", fmt.Errorf("Could not create fifo: %s : %s", path, err.Error())
 	}
 
-	fmt.Println("Created fifo: ", path)
+	//fmt.Println("Created fifo: ", path)
 	return path, nil
 }

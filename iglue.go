@@ -17,13 +17,13 @@ const (
 )
 
 type Msg struct {
-	Id      string // the sender's id
+	Header  string // the header of the message: can be any string
 	Payload string // the payload
 }
 
 // String returns a string representation of the IglueMsg
-func (m Msg) String() string {
-	return fmt.Sprint(m.Id, PAYLOAD_SEPARATOR, m.Payload)
+func (m *Msg) String() string {
+	return fmt.Sprint(m.Header, PAYLOAD_SEPARATOR, m.Payload)
 }
 
 func validateIglueId(iglueId string) error {
@@ -56,9 +56,10 @@ func Register(iglueId string) (<-chan Msg, error) {
 	// launch a go-routine that continuously reads from the fifo
 	// and stuffs the data into the channel:
 	go func() {
-		// Note: os.Open blocks until another process
-		// writes into fifo!
-		fifo, err := os.Open(fifoPath)
+		// Note: we have to open the file as read-write so as to avoid
+		// the blocking "feature" of the open call when it's done in read or write
+		// only mode.
+		fifo, err := os.OpenFile(fifoPath, os.O_RDWR, 0600)
 		if err != nil {
 			fmt.Println("!!! Fifo was removed, channel will never return data:", fifoPath, "!!!")
 		}
@@ -66,7 +67,9 @@ func Register(iglueId string) (<-chan Msg, error) {
 		buf := make([]byte, MSG_SIZE_BYTES)
 
 		for {
+			// Blocks until data is available
 			_, err := fifo.Read(buf)
+
 			if err == nil {
 				// read fixed-size messages, but trim off the
 				// padded null bytes before pushing the string into the
@@ -75,12 +78,12 @@ func Register(iglueId string) (<-chan Msg, error) {
 				splits := strings.SplitN(msg, PAYLOAD_SEPARATOR, 2)
 				iglueChan <- Msg{splits[0], splits[1]}
 			} else if err == io.EOF {
-				// not intuitive: we have to re-open the fifo if we ever get a
-				// read of zero bytes (EOF), so that we block again. Ugly,
-				// but those are the semantics of (posix) pipes.
-				fifo, err = os.Open(fifoPath)
+				// if we reach the end of the data,
+				// simply skip this current iteration and go back
+				// to blocking in the Read() call above
+				continue
 			} else {
-				fmt.Println(err)
+				fmt.Println("!!! ERROR: ", err)
 				// quit on read error
 				return
 			}
@@ -92,14 +95,14 @@ func Register(iglueId string) (<-chan Msg, error) {
 
 func Unregister(iglueId string) error {
 	path := idToFifoPath(iglueId)
-	fmt.Println("Removing fifo", path)
+	//fmt.Println("Removing fifo", path)
 	return os.Remove(path)
 }
 
 // TODO: This function has a lot of potential for
 // optimization.
-func Send(igluemsg Msg) error {
-	fifo, err := os.OpenFile(idToFifoPath(igluemsg.Id), os.O_APPEND|os.O_WRONLY, 0600)
+func Send(igluemsg *Msg, iglueIdDest string) error {
+	fifo, err := os.OpenFile(idToFifoPath(iglueIdDest), os.O_WRONLY, 0600)
 	defer fifo.Close()
 
 	if err != nil {
