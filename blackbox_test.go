@@ -81,7 +81,7 @@ func TestWriteStress(t *testing.T) {
 
 	pMsg := &iglue.Msg{"HEADER", "1234567890"}
 
-	for n := 0; n < 100000; n++ {
+	for n := 0; n < 20000; n++ {
 		iglue.Send(pMsg, "stress")
 		<-channel
 		//fmt.Println(n, <-channel)
@@ -95,7 +95,10 @@ func BenchmarkThroughput(b *testing.B) {
 	pMsg := &iglue.Msg{"HEADER", "Benchmark message"}
 
 	for n := 0; n < b.N; n++ {
-		iglue.Send(pMsg, "benchmark")
+		err := iglue.Send(pMsg, "benchmark")
+		if err != nil {
+			fmt.Println(err)
+		}
 		<-channel
 	}
 

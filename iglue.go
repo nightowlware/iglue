@@ -68,6 +68,7 @@ func Register(iglueId string) (<-chan Msg, error) {
 
 		for {
 			// Blocks until data is available
+			//fmt.Println("Before Read")
 			_, err := fifo.Read(buf)
 
 			if err == nil {
@@ -83,8 +84,9 @@ func Register(iglueId string) (<-chan Msg, error) {
 				// to blocking in the Read() call above
 				continue
 			} else {
-				fmt.Println("!!! ERROR: ", err)
 				// quit on read error
+				fmt.Println("!!! ERROR: ", err)
+				close(iglueChan)
 				return
 			}
 		}
@@ -102,6 +104,7 @@ func Unregister(iglueId string) error {
 // TODO: This function has a lot of potential for
 // optimization.
 func Send(igluemsg *Msg, iglueIdDest string) error {
+	//fmt.Println("Send(): ")
 	fifo, err := os.OpenFile(idToFifoPath(iglueIdDest), os.O_WRONLY, 0600)
 	defer fifo.Close()
 
@@ -109,18 +112,26 @@ func Send(igluemsg *Msg, iglueIdDest string) error {
 		return err
 	}
 
-	msgbuf := []byte(igluemsg.String())
+	data := []byte(igluemsg.String())
 
-	// check number of *bytes* (not characters) in msg,
+	// check number of *bytes* (not characters) in data,
 	// and make sure it's no more than the max allowed.
-	padsize := MSG_SIZE_BYTES - len(msgbuf)
+	padsize := MSG_SIZE_BYTES - len(data)
 	if padsize < 0 {
 		return errors.New("Send(): Message size exceeds max allowed!")
 	}
 
-	// force sending fixed-size messages by padding up to MSG_SIZE_BYTES
-	// the pad is made of null-bytes
-	_, err = fifo.Write(append(msgbuf, make([]byte, padsize)...))
+	// msgbuf will be created with null bytes, which pad the message up
+	// to MSG_SIZE_BYTES
+	msgbuf := make([]byte, MSG_SIZE_BYTES)
+
+	// copy message data into beginning of msgbuf
+	for i, c := range data {
+		msgbuf[i] = c
+	}
+
+	_, err = fifo.Write(msgbuf)
+	//fmt.Println("Send(): After Write")
 	return err
 }
 
