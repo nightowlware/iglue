@@ -46,7 +46,7 @@ func TestRegister(t *testing.T) {
 
 func TestFifoReadWrite(t *testing.T) {
 	id := "baz"
-	channel, _ := iglue.Register(id)
+	channel, _, _:= iglue.Register(id)
 	defer iglue.Unregister(id)
 
 	msgs := []string{"hello iglue", "this is iglue ipc", "and it works great!", "quit"}
@@ -77,7 +77,7 @@ func TestSendBadDest(t *testing.T) {
 }
 
 func TestWriteStress(t *testing.T) {
-	channel, _ := iglue.Register("stress")
+	channel, _, _ := iglue.Register("stress")
 
 	pMsg := &iglue.Msg{"HEADER", "1234567890"}
 
@@ -90,8 +90,10 @@ func TestWriteStress(t *testing.T) {
 	defer iglue.Unregister("stress")
 }
 
+///////////////////////////////////////////////
+
 func BenchmarkThroughput(b *testing.B) {
-	channel, _ := iglue.Register("benchmark")
+	channel, _, _ := iglue.Register("benchmark")
 	pMsg := &iglue.Msg{"HEADER", "Benchmark message"}
 
 	for n := 0; n < b.N; n++ {

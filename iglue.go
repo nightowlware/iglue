@@ -14,6 +14,7 @@ const (
 	MSG_SIZE_BYTES            = 1024
 	FIFO_DIR                  = "/tmp/iglue"
 	CHANNEL_BUFFER_SIZE_ITEMS = 20480 // this many MSG_SIZE_BYTES worth of buffering
+	SHUTDOWN_HEADER           = "__SHUTDOWN__"
 )
 
 type Msg struct {
@@ -34,7 +35,7 @@ func validateIglueId(iglueId string) error {
 	return nil
 }
 
-func Register(iglueId string) (<-chan Msg, error) {
+func Register(iglueId string) (<-chan Msg, error, *bool) {
 	err := validateIglueId(iglueId)
 	if err != nil {
 		panic(err)
@@ -53,6 +54,9 @@ func Register(iglueId string) (<-chan Msg, error) {
 
 	iglueChan := make(chan Msg, CHANNEL_BUFFER_SIZE_ITEMS)
 
+	aliveStatus := new(bool)
+	*aliveStatus = true
+
 	// launch a go-routine that continuously reads from the fifo
 	// and stuffs the data into the channel:
 	go func() {
@@ -67,8 +71,7 @@ func Register(iglueId string) (<-chan Msg, error) {
 		buf := make([]byte, MSG_SIZE_BYTES)
 
 		for {
-			// Blocks until data is available
-			//fmt.Println("Before Read")
+			// blocks until data is available
 			_, err := fifo.Read(buf)
 
 			if err == nil {
@@ -77,6 +80,13 @@ func Register(iglueId string) (<-chan Msg, error) {
 				// channel
 				msg := string(bytes.TrimRight(buf[:MSG_SIZE_BYTES], "\x00"))
 				splits := strings.SplitN(msg, PAYLOAD_SEPARATOR, 2)
+
+				// if we receive the special "shutdown" message, cleanup
+				// and exit goroutine.
+				if splits[0] == SHUTDOWN_HEADER {
+					break
+				}
+				// otherwise, stuff Msg in the client's channel
 				iglueChan <- Msg{splits[0], splits[1]}
 			} else if err == io.EOF {
 				// if we reach the end of the data,
@@ -85,19 +95,24 @@ func Register(iglueId string) (<-chan Msg, error) {
 				continue
 			} else {
 				// quit on read error
-				fmt.Println("!!! ERROR: ", err)
-				close(iglueChan)
-				return
+				//fmt.Println("!!! ERROR: fifo read failed, exiting goroutine")
+				break
 			}
 		}
+
+		// cleanup
+		close(iglueChan)
+		*aliveStatus = false
+		return
 	}()
 
-	return iglueChan, err
+	return iglueChan, err, aliveStatus
 }
 
 func Unregister(iglueId string) error {
+	// send a special shutdown message then delete the fifo
+	Send(&Msg{SHUTDOWN_HEADER, ""}, iglueId)
 	path := idToFifoPath(iglueId)
-	//fmt.Println("Removing fifo", path)
 	return os.Remove(path)
 }
 
