@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	PAYLOAD_SEPARATOR         = "|"
 	MSG_SIZE_BYTES            = 1024
-	FIFO_DIR                  = "/tmp/iglue"
 	CHANNEL_BUFFER_SIZE_ITEMS = 20480 // this many MSG_SIZE_BYTES worth of buffering
+	PAYLOAD_SEPARATOR         = "|"
+	FIFO_DIR                  = "/tmp/iglue"
 	SHUTDOWN_HEADER           = "__SHUTDOWN__"
 )
 
@@ -38,18 +38,18 @@ func validateIglueId(iglueId string) error {
 func Register(iglueId string) (<-chan Msg, error, *bool) {
 	err := validateIglueId(iglueId)
 	if err != nil {
-		panic(err)
+		return nil, err, nil
 	}
 
 	// ensure machine-global fifo registery directory exists
 	err = os.MkdirAll(FIFO_DIR, 0777)
 	if err != nil {
-		panic(err)
+		return nil, err, nil
 	}
 
 	fifoPath, err := createFifo(idToFifoPath(iglueId))
 	if err != nil {
-		panic(err)
+		return nil, err, nil
 	}
 
 	iglueChan := make(chan Msg, CHANNEL_BUFFER_SIZE_ITEMS)
@@ -60,10 +60,8 @@ func Register(iglueId string) (<-chan Msg, error, *bool) {
 	// launch a go-routine that continuously reads from the fifo
 	// and stuffs the data into the channel:
 	go func() {
-		// Note: we have to open the file as read-write so as to avoid
-		// the blocking "feature" of the open call when it's done in read or write
-		// only mode.
-		fifo, err := os.OpenFile(fifoPath, os.O_RDWR, 0600)
+		// blocks until writer opens fifo for writing
+		fifo, err := os.OpenFile(fifoPath, os.O_RDONLY, 0600)
 		if err != nil {
 			fmt.Println("!!! Fifo was removed, channel will never return data:", fifoPath, "!!!")
 		}
@@ -95,7 +93,6 @@ func Register(iglueId string) (<-chan Msg, error, *bool) {
 				continue
 			} else {
 				// quit on read error
-				//fmt.Println("!!! ERROR: fifo read failed, exiting goroutine")
 				break
 			}
 		}

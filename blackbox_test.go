@@ -36,17 +36,17 @@ func TestRegister(t *testing.T) {
 	time.Sleep(1000 * time.Millisecond)
 
 	if err := iglue.Unregister("foo"); err != nil {
-		t.Errorf("Could not unregister: %s", err.Error())
+		t.Fatalf("Could not unregister: %s", err.Error())
 	}
 
 	if err := iglue.Unregister("bar"); err != nil {
-		t.Errorf("Could not unregister: %s", err.Error())
+		t.Fatalf("Could not unregister: %s", err.Error())
 	}
 }
 
 func TestFifoReadWrite(t *testing.T) {
 	id := "baz"
-	channel, _, _:= iglue.Register(id)
+	channel, _, _ := iglue.Register(id)
 	defer iglue.Unregister(id)
 
 	msgs := []string{"hello iglue", "this is iglue ipc", "and it works great!", "quit"}
@@ -54,7 +54,7 @@ func TestFifoReadWrite(t *testing.T) {
 	for _, msg := range msgs {
 		err := iglue.Send(&iglue.Msg{"HEADER", msg}, "baz")
 		if err != nil {
-			t.Errorf("Error encountered while Sending! - %s", err.Error())
+			t.Fatalf("Error encountered while Sending! - %s", err.Error())
 			t.FailNow()
 		}
 	}
@@ -70,24 +70,64 @@ func TestFifoReadWrite(t *testing.T) {
 func TestSendBadDest(t *testing.T) {
 	err := iglue.Send(&iglue.Msg{"head", "tail"}, "INVALID")
 	if err == nil {
-		t.Errorf("Sending to 'INVALID' succeeded when it shouldn't have!")
+		t.Fatalf("Sending to 'INVALID' succeeded when it shouldn't have!")
 	}
 
-	fmt.Println("Result of sending to 'INVALID': ", err)
+	fmt.Println("Result of sending to 'INVALID' (should be an error): ", err)
 }
 
 func TestWriteStress(t *testing.T) {
-	channel, _, _ := iglue.Register("stress")
+	id := "stress"
+	channel, err, _ := iglue.Register(id)
+
+	if err != nil {
+		t.Fatalf("Registering for iglueId of < %s > failed!", id)
+	}
+
+	n := 40000
 
 	pMsg := &iglue.Msg{"HEADER", "1234567890"}
 
-	for n := 0; n < 20000; n++ {
+	fmt.Printf("Sending %d messages over fifo:\n", n)
+	for i := 1; i < n+1; i++ {
 		iglue.Send(pMsg, "stress")
+		if i%10000 == 0 {
+			fmt.Println(i)
+		}
 		<-channel
 		//fmt.Println(n, <-channel)
 	}
 
 	defer iglue.Unregister("stress")
+}
+
+func TestMultRegister(t *testing.T) {
+	iglue.Register("test")
+	if _, err, _ := iglue.Register("test"); err == nil {
+		t.Fatalf("Register called twice with no error!")
+	}
+	iglue.Unregister("test")
+}
+
+func TestMultUnregister(t *testing.T) {
+	iglue.Register("test")
+	iglue.Unregister("test")
+	if iglue.Unregister("test") == nil {
+		t.Fatalf("Unregister called twice with no error!")
+	}
+}
+
+func TestStopRecv(t *testing.T) {
+	_, _, status := iglue.Register("deleteme")
+
+	iglue.Send(&iglue.Msg{"Header", "useless message"}, "deleteme")
+
+	iglue.Unregister("deleteme")
+	time.Sleep(1000 * time.Millisecond)
+
+	if *status == true {
+		t.Fatalf("Recv Goroutine was not shutdown properly upon Unregister.")
+	}
 }
 
 ///////////////////////////////////////////////

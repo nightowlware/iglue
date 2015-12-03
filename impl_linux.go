@@ -9,10 +9,10 @@ import (
 
 func createFifo(path string) (string, error) {
 	err := syscall.Mknod(path, syscall.S_IFIFO|0666, 0)
+
 	if err != nil {
 		return "FIFO_FAIL", fmt.Errorf("Could not create fifo: %s : %s", path, err.Error())
 	}
 
-	//fmt.Println("Created fifo: ", path)
 	return path, nil
 }
