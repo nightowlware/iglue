@@ -12,6 +12,7 @@ func main() {
 	defer iglue.Unregister("p2")
 
 	if err != nil {
+		fmt.Println("Could not Register p2 !!!")
 		panic(err)
 	}
 
