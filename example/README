@@ -1,0 +1,1 @@
+This simple example shows 2 processes using iglue: p1 sends messages over to p2.

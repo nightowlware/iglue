@@ -22,7 +22,7 @@ type Msg struct {
 	Payload string // the payload
 }
 
-// String returns a string representation of the IglueMsg
+// Returns a string representation of the IglueMsg
 func (m *Msg) String() string {
 	return fmt.Sprint(m.Header, PAYLOAD_SEPARATOR, m.Payload)
 }
@@ -57,43 +57,45 @@ func Register(iglueId string) (<-chan Msg, error, *bool) {
 	aliveStatus := new(bool)
 	*aliveStatus = true
 
-	// launch a go-routine that continuously reads from the fifo
+	// launch a "receive" go-routine that continuously reads from the fifo
 	// and stuffs the data into the channel:
 	go func() {
 		// blocks until writer opens fifo for writing
 		fifo, err := os.OpenFile(fifoPath, os.O_RDONLY, 0600)
+
 		if err != nil {
-			fmt.Println("!!! Fifo was removed, channel will never return data:", fifoPath, "!!!")
-		}
+			fmt.Println("!!! OpenFile failed, goroutine exiting: ", fifoPath, "!!!")
+		} else {
 
-		buf := make([]byte, MSG_SIZE_BYTES)
+			buf := make([]byte, MSG_SIZE_BYTES)
 
-		for {
-			// blocks until data is available
-			_, err := fifo.Read(buf)
+			for {
+				// blocks until data is available
+				_, err := fifo.Read(buf)
 
-			if err == nil {
-				// read fixed-size messages, but trim off the
-				// padded null bytes before pushing the string into the
-				// channel
-				msg := string(bytes.TrimRight(buf[:MSG_SIZE_BYTES], "\x00"))
-				splits := strings.SplitN(msg, PAYLOAD_SEPARATOR, 2)
+				if err == nil {
+					// read fixed-size messages, but trim off the
+					// padded null bytes before pushing the string into the
+					// channel
+					msg := string(bytes.TrimRight(buf[:MSG_SIZE_BYTES], "\x00"))
+					splits := strings.SplitN(msg, PAYLOAD_SEPARATOR, 2)
 
-				// if we receive the special "shutdown" message, cleanup
-				// and exit goroutine.
-				if splits[0] == SHUTDOWN_HEADER {
+					// if we receive the special "shutdown" message, cleanup
+					// and exit goroutine.
+					if splits[0] == SHUTDOWN_HEADER {
+						break
+					}
+					// otherwise, stuff Msg in the client's channel
+					iglueChan <- Msg{splits[0], splits[1]}
+				} else if err == io.EOF {
+					// if we reach the end of the data,
+					// simply skip this current iteration and go back
+					// to blocking in the Read() call above
+					continue
+				} else {
+					// quit on read error
 					break
 				}
-				// otherwise, stuff Msg in the client's channel
-				iglueChan <- Msg{splits[0], splits[1]}
-			} else if err == io.EOF {
-				// if we reach the end of the data,
-				// simply skip this current iteration and go back
-				// to blocking in the Read() call above
-				continue
-			} else {
-				// quit on read error
-				break
 			}
 		}
 
