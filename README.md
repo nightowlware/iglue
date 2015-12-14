@@ -14,4 +14,4 @@ iglue uses named pipes/fifos as the underlying ipc mechanism.
 
 For sending, a fixed-size string message is written directly to the pipe matching the destination iglue ID.  
 For receiving, a dedicated goroutine constantly waits for messages on the named pipe; when a new message arrives,
-it is written to the client's receving channel.
+it is written to the client's receiving channel.
