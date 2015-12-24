@@ -35,27 +35,24 @@ func validateIglueId(iglueId string) error {
 	return nil
 }
 
-func Register(iglueId string) (<-chan Msg, error, *bool) {
+func Register(iglueId string) (<-chan Msg, error) {
 	err := validateIglueId(iglueId)
 	if err != nil {
-		return nil, err, nil
+		return nil, err
 	}
 
 	// ensure machine-global fifo registery directory exists
 	err = os.MkdirAll(FIFO_DIR, 0777)
 	if err != nil {
-		return nil, err, nil
+		return nil, err
 	}
 
 	fifoPath, err := createFifo(idToFifoPath(iglueId))
 	if err != nil {
-		return nil, err, nil
+		return nil, err
 	}
 
 	iglueChan := make(chan Msg, CHANNEL_BUFFER_SIZE_ITEMS)
-
-	aliveStatus := new(bool)
-	*aliveStatus = true
 
 	// launch a "receive" go-routine that continuously reads from the fifo
 	// and stuffs the data into the channel:
@@ -101,11 +98,10 @@ func Register(iglueId string) (<-chan Msg, error, *bool) {
 
 		// cleanup
 		close(iglueChan)
-		*aliveStatus = false
 		return
 	}()
 
-	return iglueChan, err, aliveStatus
+	return iglueChan, err
 }
 
 func Unregister(iglueId string) error {

@@ -46,7 +46,7 @@ func TestRegister(t *testing.T) {
 
 func TestFifoReadWrite(t *testing.T) {
 	id := "baz"
-	channel, _, _ := iglue.Register(id)
+	channel, _ := iglue.Register(id)
 	defer iglue.Unregister(id)
 
 	msgs := []string{"hello iglue", "this is iglue ipc", "and it works great!", "quit"}
@@ -78,7 +78,7 @@ func TestSendBadDest(t *testing.T) {
 
 func TestWriteStress(t *testing.T) {
 	id := "stress"
-	channel, err, _ := iglue.Register(id)
+	channel, err := iglue.Register(id)
 
 	if err != nil {
 		t.Fatalf("Registering for iglueId of < %s > failed!", id)
@@ -103,7 +103,7 @@ func TestWriteStress(t *testing.T) {
 
 func TestMultRegister(t *testing.T) {
 	iglue.Register("test")
-	if _, err, _ := iglue.Register("test"); err == nil {
+	if _, err := iglue.Register("test"); err == nil {
 		t.Fatalf("Register called twice with no error!")
 	}
 	iglue.Unregister("test")
@@ -118,14 +118,11 @@ func TestMultUnregister(t *testing.T) {
 }
 
 func TestStopRecv(t *testing.T) {
-	_, _, status := iglue.Register("deleteme")
-
-	iglue.Send(&iglue.Msg{"Header", "useless message"}, "deleteme")
-
+	channel, _ := iglue.Register("deleteme")
 	iglue.Unregister("deleteme")
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(2000 * time.Millisecond)
 
-	if *status == true {
+	if _, alive := <-channel; alive {
 		t.Fatalf("Recv Goroutine was not shutdown properly upon Unregister.")
 	}
 }
@@ -133,7 +130,7 @@ func TestStopRecv(t *testing.T) {
 ///////////////////////////////////////////////
 
 func BenchmarkThroughput(b *testing.B) {
-	channel, _, _ := iglue.Register("benchmark")
+	channel, _ := iglue.Register("benchmark")
 	pMsg := &iglue.Msg{"HEADER", "Benchmark message"}
 
 	for n := 0; n < b.N; n++ {
